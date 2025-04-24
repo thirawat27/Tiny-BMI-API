@@ -1,85 +1,73 @@
-// app/api/bmi/route.js
-
 /**
+ * app/api/bmi/route.js
  * BMI API - คำนวณดัชนีมวลกาย (BMI) และให้คำแนะนำเกี่ยวกับสุขภาพ
- * 
- * วิธีใช้: GET /api/bmi?weight=<น้ำหนักเป็นกิโลกรัม>&height=<ส่วนสูงเป็นเซนติเมตร>
- * หรือ: GET /api/bmi?weight=<น้ำหนักเป็นกิโลกรัม>&height=<ส่วนสูงเป็นเมตร>&unit=m
+ *
+ * วิธีใช้:
+ *   GET  /api/bmi?weight=<น้ำหนักเป็นกิโลกรัม>&height=<ส่วนสูงเป็นเซนติเมตร>
+ *   หรือ:
+ *   GET  /api/bmi?weight=<น้ำหนักเป็นกิโลกรัม>&height=<ส่วนสูงเป็นเมตร>&unit=m
  */
+
 export async function GET(request) {
-  // แยก query parameters จาก URL
   const { searchParams } = new URL(request.url);
   const weight = searchParams.get('weight');
   const height = searchParams.get('height');
-  const unit = searchParams.get('unit') || 'cm'; // ค่าเริ่มต้นเป็น cm ถ้าไม่ระบุ
+  const unit = searchParams.get('unit') || 'cm';
 
-  // ตรวจสอบว่ามีการส่ง weight และ height เข้ามาหรือไม่
   if (!weight || !height) {
     return createErrorResponse(
-      "Missing parameters", 
-      "ต้องระบุทั้งน้ำหนัก (weight) และส่วนสูง (height)", 
+      "Missing parameters",
+      "ต้องระบุทั้งน้ำหนัก (weight) และส่วนสูง (height)",
       400
     );
   }
 
-  // แปลงค่าเป็นตัวเลข
   const weightNum = parseFloat(weight);
   const heightNum = parseFloat(height);
 
-  // ตรวจสอบว่าค่าที่รับมาถูกต้องหรือไม่
   if (isNaN(weightNum) || isNaN(heightNum)) {
     return createErrorResponse(
-      "Invalid values", 
-      "น้ำหนักและส่วนสูงต้องเป็นตัวเลขเท่านั้น", 
+      "Invalid values",
+      "น้ำหนักและส่วนสูงต้องเป็นตัวเลขเท่านั้น",
       400
     );
   }
 
-  // ตรวจสอบว่าค่าไม่ติดลบ
   if (weightNum <= 0 || heightNum <= 0) {
     return createErrorResponse(
-      "Invalid values", 
-      "น้ำหนักและส่วนสูงต้องมีค่ามากกว่า 0", 
+      "Invalid values",
+      "น้ำหนักและส่วนสูงต้องมีค่ามากกว่า 0",
       400
     );
   }
 
-  // แปลงส่วนสูงเป็นเมตรตามหน่วยที่ระบุ
   let heightInMeters;
   if (unit.toLowerCase() === 'm') {
     heightInMeters = heightNum;
   } else {
-    heightInMeters = heightNum / 100; // แปลงจาก cm เป็น m
+    heightInMeters = heightNum / 100;
   }
 
-  // ตรวจสอบความสมเหตุสมผลของค่า
   if (weightNum > 500) {
     return createErrorResponse(
-      "Value out of range", 
-      "น้ำหนักดูเหมือนจะสูงเกินไป (ไม่ควรเกิน 500 กก.)", 
+      "Value out of range",
+      "น้ำหนักดูเหมือนจะสูงเกินไป (ไม่ควรเกิน 500 กก.)",
       400
     );
   }
-  
   if (heightInMeters > 3) {
     return createErrorResponse(
-      "Value out of range", 
-      "ส่วนสูงดูเหมือนจะสูงเกินไป (ไม่ควรเกิน 3 เมตร)", 
+      "Value out of range",
+      "ส่วนสูงดูเหมือนจะสูงเกินไป (ไม่ควรเกิน 3 เมตร)",
       400
     );
   }
 
-  // คำนวณ BMI
   const bmi = weightNum / (heightInMeters ** 2);
-  const bmiRounded = parseFloat(bmi.toFixed(2)); // ปัดเศษให้เหลือทศนิยม 2 ตำแหน่ง
-
-  // รับข้อมูลระดับ BMI
+  const bmiRounded = parseFloat(bmi.toFixed(2));
   const bmiCategory = getBMICategory(bmiRounded);
-  
-  // รับคำแนะนำสุขภาพ
   const healthTips = getHealthTips(bmiRounded);
 
-  // ส่งกลับข้อมูลในรูปแบบ JSON
   return new Response(
     JSON.stringify({
       success: true,
@@ -97,9 +85,10 @@ export async function GET(request) {
     }),
     {
       status: 200,
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
-        "Cache-Control": "max-age=3600" // เก็บแคชไว้ 1 ชั่วโมง
+        "Cache-Control": "max-age=3600",
+        "Access-Control-Allow-Origin": "*"
       }
     }
   );
@@ -119,7 +108,10 @@ function createErrorResponse(title, detail, status = 400) {
     }),
     {
       status: status,
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
     }
   );
 }
@@ -191,24 +183,21 @@ function getHealthTips(bmiValue) {
   }
 }
 
-// สำหรับการใช้ผ่านเมธอด POST (ถ้าต้องการในอนาคต)
+// รองรับการเรียกผ่าน POST
 export async function POST(request) {
   try {
     const body = await request.json();
     const { weight, height, unit = 'cm' } = body;
-    
-    // ใช้ URL และ searchParams เพื่อให้สามารถใช้โค้ดเดิม
     const url = new URL(request.url);
     url.searchParams.set('weight', weight);
     url.searchParams.set('height', height);
     url.searchParams.set('unit', unit);
-    
-    // เรียกใช้ฟังก์ชั่น GET กับ URL ที่สร้างขึ้น
+
     const modifiedRequest = {
       ...request,
       url: url.toString()
     };
-    
+
     return GET(modifiedRequest);
   } catch (error) {
     return createErrorResponse(
